@@ -20,6 +20,7 @@
     "passport": "^0.6.0",
     "passport-local": "^1.0.0",
     "pg": "^8.8.0",
+    "stripe": "^10.11.0",
     "swagger-jsdoc": "^6.2.5"
   }
 }

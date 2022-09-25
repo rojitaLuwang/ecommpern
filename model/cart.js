@@ -3,7 +3,7 @@ const express = require('express');
 const isAuthorized = require('../utils/isAuthorized');
 const cardRouter = require('./card');
 const cartRouter = express.Router();
-
+const stripe = require("stripe")(process.env.STRIPE_SECRET)
 cardRouter.use(isAuthorized);
 // const client = new Client()
 // client.connect()
@@ -16,7 +16,7 @@ cart_query = {
 
 cart_total_by_customer_query = {
     name: 'cart_total_by_customer',
-    text: `select sum(p.price_per_unit * op.quantity) totalcost from "product"  p , "order_product" op, "order" o where op.product_id = p.id and 
+    text: `select max(o.id) id, sum(p.price_per_unit * op.quantity) totalcost from "product"  p , "order_product" op, "order" o where op.product_id = p.id and 
     op.order_id = o.id and o.id = (select max(id) from "order" oi where oi.customer_id = $1)`
   };
 
@@ -30,11 +30,11 @@ cart_items_by_customer_query = {
 
 cart_checkout_query = {
     name: 'get-cart-by-id',
-    text: `SELECT count(*) count, sum(quantity) sum, sum(op.quantity * p.price_per_unit) total 
+    text: `SELECT p.name name, p.price_per_unit unitprice, op.quantity quantity 
       FROM order_product op, "order" o, product p 
       WHERE o.id = $1 
       AND o.id = op.order_id
-      AND p.id = op.product_id`,
+      AND p.id = op.product_id`
   };
 
 complete_checkout_query = {
@@ -78,7 +78,7 @@ getCartTotalByCustomer = async function (customerId){
   const res = await client.query(cart_total_by_customer_query);
 
   if (res.rowCount == 0) return JSON.stringify([]);
-  return JSON.stringify(res.rows[0]);
+  return res.rows[0];
 };
 
 
@@ -95,14 +95,34 @@ getCartItemsByCustomer = async function (customerId){
 getCartCheckoutInfo = async function (orderId){
   cart_checkout_query['values'] = [orderId];
   const res = await client.query(cart_checkout_query);
-  const rows = res.rows;
-  return rows[0];
+  return res;
 };
 
-getCompleteCheckout = async function (orderId, order){
-  complete_checkout_query['values'] = [orderId];
-  const res = await client.query(complete_checkout_query);
-  return res.rows[0];
+getCompleteCheckout = async function (orderId, order, res){
+  console.log(`Unit price ${order[0].unitprice* 100}`)
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ["card"],
+    line_items: order.map(({ name, unitprice, quantity }) => {
+      return {
+        price_data: {
+          currency: "gbp",
+          product_data: {
+            name: name,
+          },
+          unit_amount: unitprice * 100,
+        },
+        quantity: quantity,
+      }
+    }),
+    mode: "payment",
+    // Set a success and cancel URL we will send customers to
+    // They are complete urls    
+    success_url: `${process.env.CLIENT_URL}/checkout-success`,
+    cancel_url: `${process.env.CLIENT_URL}/error`,
+  })
+  console.log(`session url ${session.url}`);
+  res.json({ url: session.url })
+  
 };
 
 updateCart = async function(orderId, productId, productCount){
@@ -174,9 +194,9 @@ cartRouter.get('/:id', (req, res) => {
   cartRouter.get('/total/customer/:id', (req, res) => {
     
     (async () => {
-      const totalItemsCost = await getCartTotalByCustomer(req.params.id);
-      console.log(`Fetching cart total: ${totalItemsCost} for customer id : ${req.params.id}`);
-      res.send(totalItemsCost);
+      const costData = await getCartTotalByCustomer(req.params.id);
+      console.log(`Fetching cart total: ${costData.totalcost} for customer id : ${req.params.id} and order ${costData.id}`);
+      res.send({id: costData.id, totalCost: costData.totalcost});
     })()
     
   });
@@ -219,17 +239,16 @@ cartRouter.get('/:id', (req, res) => {
     *                       }
  *           
  */ 
-  cartRouter.get('/:id/checkout', (req, res) => {
+  cartRouter.post('/:id/checkout', (req, res) => {
     console.log("Fetching cart checkout info for order_id:  " + req.params.id);
     (async () => {
-      const data = await getCartCheckoutInfo(req.params.id);
-      const orderExist = data.count > 0 && data.sum != null && data.sum > 0
-      console.log(`Order Exists: ${orderExist}`);
-      if(orderExist){
-        const completedOrder = await getCompleteCheckout(req.params.id, order);
-        res.send(`  Order Total ${data.total} Status ${completedOrder.status} for order ${completedOrder.id}`);
+      const order = await getCartCheckoutInfo(req.params.id);
+      console.log(`Order Exists: ${JSON.stringify(order.rows)}`);
+      if(order.rowCount > 0){
+        await getCompleteCheckout(req.params.id, order.rows, res);
+        //res.send(`  Order Total ${data.total} Status ${completedOrder.status} for order ${completedOrder.id}`);
       }else {
-        res.send('  Order does not exists');
+        res.send('{}');
       }
      
     })()
