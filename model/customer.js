@@ -6,6 +6,7 @@ const app = express();
 const customerRouter = express.Router();
 const client = require('../utils/queries');
 const isAuthorized = require('../utils/isAuthorized');
+const { nameExists, matchPassword } = require("../model/register");
 
 // const client = new Client()
 // client.connect();
@@ -36,8 +37,12 @@ all_customers_query = {
   text: 'SELECT id, name, phone FROM customer limit 100' ,
 };
 
+update_password_query = {
+  name: 'update-password',
+  text: 'update customer set password  = $2 where id = $1 RETURNING name'
+};
 
-customer_query = {
+customer_contact_query = {
     name: 'get-customer-by-id',
     text: 'SELECT * FROM customer WHERE id = $1',
   };
@@ -63,12 +68,19 @@ getAllCustomers = async function (){
   const res = await client.query(all_customers_query);
   return res.rows;
 };
+ 
 
-getCustomerInfo = async function (customerId){
-    customer_query['values'] = [customerId];
-    const res = await client.query(customer_query);
-    const rows = res.rows;
-    return JSON.stringify(rows[0]);
+updatePassword = async function(customerId, password){
+  update_password_query['values'] = [customerId, password];
+  const res = await client.query(update_password_query);
+  return res.rowCount;
+
+}
+
+getCustomerContactInfo = async function (customerId){
+  customer_contact_query['values'] = [customerId];
+    const res = await client.query(customer_contact_query);
+    return res;
 };
 
 deleteCustomer = async function(customerId){
@@ -168,17 +180,16 @@ customerRouter.get('/', (req, res) => {
  *           
  */ 
 customerRouter.get('/detail/:id', (req, res) => {
-    // console.log("Customer Details " + req.params.id);
-    // console.log('user from session '+ req.user);
-    // console.log('isAuthenticated '+ req.isAuthenticated());
-    
     (async () => {
-      const details = await getCustomerInfo(req.params.id);
+      const result = await getCustomerContactInfo(req.params.id);
+      const details = JSON.stringify(result.rows);
       console.log(`Customer contact details : ${details}`);
       res.send(details);
     })()
     
   });
+
+
 /**
  * @swagger
  * /customer/{id}:
@@ -299,5 +310,37 @@ customerRouter.get('/detail/:id', (req, res) => {
     })()
     
   });
+
+  customerRouter.post('/changepassword/:userId', (req, res) => {
+    (async () => {
+      console.log("Fetching  email using user id " + req.params.userId);
+      const result = await getCustomerContactInfo(req.params.userId);
+      let updateSuccess = false;
+      if (result.rowCount > 0){
+        const name = result.rows[0].name;
+        const user = await nameExists(name);
+        if (user) {
+          const isMatch = await matchPassword(req.body.current_password, user.password);
+          console.log(`isMatch ${isMatch} id ${req.params.userId} name ${name}`);
+          if (isMatch){
+            const salt = await bcrypt.genSalt(10);
+            const hash = await bcrypt.hash(req.body.new_password, salt);            
+            const rowCount = await updatePassword(req.params.userId, hash)
+            updateSuccess = rowCount > 0;
+          }
+        }
+      }
+      console.log(`Result : ${updateSuccess}`);
+      if (updateSuccess){
+        res.send(JSON.stringify(updateSuccess));
+      }else{
+        res.send(JSON.stringify("Failed to update password"));
+      }
+    })()
+    
+  });
+
+  
+
   module.exports = customerRouter;
   

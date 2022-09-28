@@ -23,6 +23,7 @@ app.use(
     secret: "secret-key",
     resave: true,
     saveUninitialized: true,
+    // cookie: {maxAge: 1000}
   })
 );
 
@@ -200,14 +201,23 @@ app.post("/api/auth/google/login/success",
 );
 
 
-
 // app.use(auth);
 
 app.use('/api/customer', customerRouter);
 app.use('/api/orders', orderRouter);
 app.use('/api/products', productRouter);
 app.use('/api/cart', cartRouter);
-app.use('/api/card', cardRouter)
+app.use('/api/card', cardRouter);
+
+
+app.post('/api/logout', (req, res) => {
+  req.logout(function(err) {
+    if (err) { return next(err); }
+    console.log("Logging out")
+    res.send();
+  });
+});
+
 
 let port = process.env.PORT;
 if (port == null || port == "") {

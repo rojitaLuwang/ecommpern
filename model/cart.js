@@ -37,7 +37,7 @@ cart_checkout_query = {
       AND p.id = op.product_id`
   };
 
-complete_checkout_query = {
+complete_checkout_status_query = {
     name: 'complete-checkout-by-id',
     text: `UPDATE "order" SET completed = CURRENT_TIMESTAMP, status = 'COMPLETED' WHERE id = $1 returning id, status`,
 };
@@ -90,7 +90,11 @@ getCartItemsByCustomer = async function (customerId){
   return JSON.stringify(res.rows);
 };
 
-
+getCompleteCheckoutStatus = async function (orderId){
+  complete_checkout_status_query['values'] = [orderId];
+  const res = await client.query(complete_checkout_status_query);
+  return res;
+};
 
 getCartCheckoutInfo = async function (orderId){
   cart_checkout_query['values'] = [orderId];
@@ -117,11 +121,11 @@ getCompleteCheckout = async function (orderId, order, res){
     mode: "payment",
     // Set a success and cancel URL we will send customers to
     // They are complete urls    
-    success_url: `${process.env.CLIENT_URL}/checkout-success`,
+    success_url: `${process.env.CLIENT_URL}/checkoutsuccess`,
     cancel_url: `${process.env.CLIENT_URL}/error`,
   })
   console.log(`session url ${session.url}`);
-  res.json({ url: session.url })
+  res.send({ url: session.url })
   
 };
 
@@ -196,7 +200,7 @@ cartRouter.get('/:id', (req, res) => {
     (async () => {
       const costData = await getCartTotalByCustomer(req.params.id);
       console.log(`Fetching cart total: ${costData.totalcost} for customer id : ${req.params.id} and order ${costData.id}`);
-      res.send({id: costData.id, totalCost: costData.totalcost});
+      res.send({id: costData.id, totalcost: costData.totalcost});
     })()
     
   });
@@ -245,7 +249,10 @@ cartRouter.get('/:id', (req, res) => {
       const order = await getCartCheckoutInfo(req.params.id);
       console.log(`Order Exists: ${JSON.stringify(order.rows)}`);
       if(order.rowCount > 0){
+        await getCompleteCheckoutStatus(req.params.id);
+        console.log(`Updated status - COMPLETED`);
         await getCompleteCheckout(req.params.id, order.rows, res);
+        
         //res.send(`  Order Total ${data.total} Status ${completedOrder.status} for order ${completedOrder.id}`);
       }else {
         res.send('{}');

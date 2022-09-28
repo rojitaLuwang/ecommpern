@@ -16,9 +16,13 @@ is_exists_order_query = {
 order_completed_query = {
     name: 'get-order-by-id',
     // text: `SELECT * FROM "order" WHERE id = $1 AND status = 'COMPLETED'`,
-    text: `select p.*, op.quantity count, op.quantity * p.price_per_unit cost 
+    // text: `select p.*, op.quantity count, op.quantity * p.price_per_unit cost 
+    // from  product p, order_product op,"order" o 
+    // where op.order_id = o.id and p.id = op.product_id and o.customer_id = $1 and o.status = 'COMPLETED'`,
+    text: `select o.id oid, o.completed orderdate, sum(op.quantity * p.price_per_unit) totalcost
     from  product p, order_product op,"order" o 
-    where op.order_id = o.id and p.id = op.product_id and o.customer_id = $1 and o.status = 'COMPLETED'`,
+    where op.order_id = o.id and p.id = op.product_id and o.customer_id = $1 and o.status = 'COMPLETED'
+	group by o.id`,
   };
 
 order_current_query = {
@@ -61,9 +65,9 @@ getCompletedOrderInfo = async function (customerId){
     order_completed_query['values'] = [customerId];
     const res = await client.query(order_completed_query);
     const rows = res.rows;
-    
-    //return JSON.stringify(rows[0]);
-    return rows;
+    // if(res.rowCount === 0) return JSON.stringify([])
+    return JSON.stringify(rows);
+    // return rows;
 };
 
 getCurrentOrderInfo = async function (customerId){
@@ -139,7 +143,6 @@ updateOrder = async function(orderId, status){
  *           
  */ 
 orderRouter.get('/customer/:id', (req, res) => {
-    // console.log("Fetching completed order " + req.params.id);
     (async () => {
       const completed = await getCompletedOrderInfo(req.params.id);
       console.log(`Completed Orders: ${completed}`);
