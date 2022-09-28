@@ -64,10 +64,7 @@ checkIfOrderExists = async function(customerId){
 getCompletedOrderInfo = async function (customerId){
     order_completed_query['values'] = [customerId];
     const res = await client.query(order_completed_query);
-    const rows = res.rows;
-    // if(res.rowCount === 0) return JSON.stringify([])
-    return JSON.stringify(rows);
-    // return rows;
+    return res;
 };
 
 getCurrentOrderInfo = async function (customerId){
@@ -144,12 +141,16 @@ updateOrder = async function(orderId, status){
  */ 
 orderRouter.get('/customer/:id', (req, res) => {
     (async () => {
-      const completed = await getCompletedOrderInfo(req.params.id);
-      console.log(`Completed Orders: ${completed}`);
-      if(completed.rowCount > 0){
-        res.send(completed);
-      }
-      res.send(JSON.stringify([]));
+      const result = await getCompletedOrderInfo(req.params.id);
+      const details = JSON.stringify(result.rows);
+      console.log(`completed orders : ${details}`);
+      res.send(details)
+      // console.log(`Completed Orders: ${completed}`);
+      // console.log(`Rowcount orders: ${completed.rowCount}`);
+      // if(completed){
+      //   res.send(JSON.stringify(completed));
+      // }
+      // res.send(JSON.stringify([]));
     })()
     
   });
