@@ -163,7 +163,6 @@ productRouter.get('/:id', (req, res) => {
  *           
  */ 
   productRouter.get('/search/:term', (req, res) => {
-    console.log("Fetching products by term " + req.params.term);
     (async () => {
       res.send(await getProductsBySearch(req.params.term));
     })()
