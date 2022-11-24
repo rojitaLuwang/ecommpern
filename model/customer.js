@@ -60,7 +60,7 @@ update_customer_query = {
 
 update_customer_detail_query = {
   name: 'update-customer-by-id',
-  text: 'UPDATE customer SET address_1 = $1, address_2 = $2, postcode = $3, phone = $4 WHERE id = $5',
+  text: 'UPDATE customer SET address_1 = $1, address_2 = $2, postcode = $3, phone = $4, email = $5 WHERE id = $6',
 };
 
 
@@ -102,8 +102,8 @@ updateCustomer = async function(password, phone, customerId){
     
 };
 
-updateCustomerDetail = async function(address_1 = null, address_2 = null, postcode = null, phone = null, customerId){
-  update_customer_detail_query['values'] = [address_1, address_2, postcode, phone, customerId];
+updateCustomerDetail = async function(address_1 = null, address_2 = null, postcode = null, phone = null,email = null, customerId){
+  update_customer_detail_query['values'] = [address_1, address_2, postcode, phone, email, customerId];
   const res = await client.query(update_customer_detail_query);
   const rows = res.rows;
   return JSON.stringify(rows);
@@ -293,12 +293,12 @@ customerRouter.get('/detail/:id', (req, res) => {
   });
 
 
-  customerRouter.post('/detail/:id', (req, res) => {
-    console.log("Inserting customer detail " + req.params.id);
+  customerRouter.post('/detail/:userId', (req, res) => {
+    console.log("Inserting customer detail " + req.params.userId);
     const body = req.body;
     console.log(`>>>>>> ${body.address_1} >>>>> ${body.phone}`);
     (async () => {
-       res.send(await updateCustomerDetail(body.address_1, body.address_2, body.postcode, body.phone, req.params.id));
+       res.send(await updateCustomerDetail(body.address_1, body.address_2, body.postcode, body.phone, body.email, req.params.userId));
     })()
     
   });

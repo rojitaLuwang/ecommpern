@@ -23,7 +23,7 @@ module.exports = (passport) => {
    
             const user = await createUser(name, req.body.email, password);
             console.log(`>>>>>>>>>>>> Returning user ${user}`);
-            return done(null, user);
+            return done(null, {id: user.id, name: user.name, oauth2_id: null});
           } catch (error) {
             done(error);
           }
@@ -47,7 +47,7 @@ module.exports = (passport) => {
               const isMatch = await matchPassword(password, user.password);
               console.log(`isMatch ${isMatch} id ${user.id} name ${user.name}`);
               if (!isMatch) return done(null, false);
-              return done(null, {id: user.id, name: user.name});
+              return done(null, {id: user.id, name: user.name, oauth2_id: null});
             } catch (error) {
               return done(error, false);
             }
@@ -80,7 +80,7 @@ module.exports = (passport) => {
               console.log(`>>>>>>>>>>>> Returning user ${user}`);
               return done(null, user);
             }
-            return done(null, {id: user.id, name: user.name});
+            return done(null, {id: user.id, name: user.name, oauth2_id: user.oauth2_id});
             
           } catch (error) {
             done(error);
