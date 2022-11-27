@@ -40,6 +40,11 @@ insert_card_detail_query = {
     text: 'INSERT INTO "card_detail"(name_on_card, card_number, expiry_date, card_type) VALUES ($1, $2, $3, $4) returning id',
 };
 
+update_card_detail_into_customer_query = {
+  name: 'update-new-card-in-customer',
+  text: 'UPDATE "customer" SET card_id = $1 WHERE id = $2  returning card_id',
+};
+
 update_card_detail_query = {
     name: 'update-card-by-id',
     text: 'UPDATE "card_detail" SET name_on_card = $1, card_number = $2, expiry_date = $3, card_type = $4 WHERE id = $5',
@@ -48,8 +53,7 @@ update_card_detail_query = {
 getCardDetailInfo = async function (customerId){
     card_detail_query['values'] = [customerId];
     const res = await client.query(card_detail_query);
-    const rows = res.rows;
-    return JSON.stringify(rows[0]);
+    return res;
 };
 
 getCardDetailByCustomer = async function (customerId){
@@ -66,6 +70,14 @@ insertCardDetail = async function(name_on_card, card_number, expiry_date, card_t
     const rows = res.rows;
     console.log('Card inserted rows : ' + rows[0].id);
     return rows[0].id
+};
+
+
+updateCardDetailInCustomer = async function(card_id, customerId){
+  update_card_detail_into_customer_query['values'] = [card_id, customerId];
+  const res = await client.query(update_card_detail_into_customer_query);
+  const rows = res.rows;
+  console.log('Card number inserted in customer : ' + rows[0].card_id);
 };
 
 updateCardDetail = async function(name_on_card, card_number, expiry_date, card_type, id){
@@ -115,11 +127,9 @@ cardRouter.get('/:id', (req, res) => {
     //console.log("Fetching card " + req.params.id);
     (async () => {
       const gotCard = await getCardDetailInfo(req.params.id);
+      const details = JSON.stringify(gotCard.rows);
       console.log(`Card details: ${gotCard}`);
-      if(gotCard.rowCount > 0){
-        res.send(gotCard);
-      }
-      res.send(JSON.stringify([]));
+      res.send(details);
     })()
     
   });
@@ -223,12 +233,13 @@ cardRouter.put('/:id', (req, res) => {
     *                       }
  *           
  */ 
-  cardRouter.post('/', (req, res) => {
+  cardRouter.post('/new/:id', (req, res) => {
     console.log("Creating new card.");
     console.log(req.body);
     const {name_on_card, card_number, expiry_date, card_type} = req.body;
     (async () => {
-       const cardId = await insertProduct(name_on_card, card_number, expiry_date, card_type);
+       const cardId = await insertCardDetail(name_on_card, card_number, expiry_date, card_type);
+       await updateCardDetailInCustomer(cardId, req.params.id);
        res.send(`Card created with cardId ${cardId}`);
     })()
   });
