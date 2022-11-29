@@ -11,10 +11,6 @@ require("./utils/passportConfig")(passport);
 const LocalStrategy = require("passport-local").Strategy;
 const session = require("express-session");
 
-// const { Client } = require('pg');
-// const client = new Client();
-// client.connect();
-
 app.use(bodyParser.json());
 app.use(urlencodedParser);
 app.use(cors());
